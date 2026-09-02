@@ -1,62 +1,40 @@
+const CATEGORIES = [
+  "Embedded Systems",
+  "C / Embedded C",
+  "RTOS",
+  "Electronics",
+  "PCB & Hardware",
+  "Projects",
+  "Edge AI & AI in Electronics",
+  "Power Electronics"
+];
+
 const POSTS = [
   {
-    slug: "what-volatile-solves",
-    title: "What volatile Actually Solves — and What It Does Not",
-    category: "C Programming",
+    slug: "what-is-volatile-in-c",
+    title: "volatile in C: What It Does, When to Use It, and What It Does Not Solve",
+    category: "C / Embedded C",
     date: "September 2, 2026",
-    excerpt:
-      "volatile helps the compiler treat a value as capable of changing unexpectedly. It does not make shared data atomic or automatically solve concurrency problems.",
+    excerpt: "A practical guide to volatile in C, including interrupts, hardware registers, compiler optimization, atomicity, and the common mistakes embedded developers make.",
     content: `
+      <div class="quick-answer">
+        <strong>Quick answer:</strong> In C, <code>volatile</code> tells the compiler that accesses to an object have special observable behavior and must not be optimized like ordinary accesses. It is commonly relevant to hardware registers and values changed by interrupt or other external mechanisms. It does <strong>not</strong> make an operation atomic, make shared data automatically thread-safe, or replace synchronization.
+      </div>
+
       <h2>Why does volatile exist?</h2>
-
-      <p>
-        In embedded C, you will often see variables declared with the
-        <code>volatile</code> keyword, especially when dealing with interrupts,
-        hardware registers, or memory that can change outside the normal flow
-        of a program.
-      </p>
-
-      <p>
-        A common explanation is:
-        <strong>"volatile tells the compiler that the variable can change unexpectedly."</strong>
-        That explanation is useful, but incomplete.
-      </p>
-
-      <p>
-        The more important question is:
-        <strong>What problem does volatile actually solve?</strong>
-      </p>
-
-      <p>
-        The short answer is that <strong>volatile addresses how the compiler
-        treats accesses to an object whose value may change for reasons
-        outside the ordinary flow of the code being compiled.</strong>
-        It does not, by itself, solve atomicity, synchronization, or
-        concurrency problems.
-      </p>
+      <p>In embedded C, you will often see <code>volatile</code> around variables associated with interrupts, peripherals, status registers, or other state that can change outside the ordinary sequence of instructions in the code being compiled.</p>
+      <p>A common explanation is: <em>"volatile tells the compiler that the variable can change unexpectedly."</em> That is a useful starting point, but it hides the important detail: <strong>volatile is primarily about how the compiler must treat accesses to an object.</strong></p>
 
       <h2>A simple example</h2>
-
-      <p>Consider this code:</p>
-
+      <p>Consider a loop that waits for a value to change:</p>
       <pre><code>int flag = 0;
 
 while (flag == 0)
 {
     // Wait for something to happen
 }</code></pre>
-
-      <p>
-        From our perspective, the loop continuously checks
-        <code>flag</code>.
-        But the compiler is allowed to optimize ordinary code based on what
-        it can determine about the program.
-      </p>
-
-      <p>
-        Now imagine that an interrupt service routine changes the variable:
-      </p>
-
+      <p>If nothing in the visible execution flow changes <code>flag</code>, the compiler can reason about the program and optimize ordinary accesses according to the C language rules.</p>
+      <p>Now imagine that an interrupt service routine can change the value:</p>
       <pre><code>int flag = 0;
 
 void ISR(void)
@@ -71,55 +49,23 @@ int main(void)
         // Wait
     }
 
-    // Continue after the interrupt
+    // Continue
 }</code></pre>
-
-      <p>
-        The programmer knows that an interrupt can modify
-        <code>flag</code>. The compiler does not automatically treat every
-        ordinary variable as something that can be changed asynchronously.
-      </p>
-
-      <p>
-        This is where <code>volatile</code> becomes important:
-      </p>
-
+      <p>The programmer knows that an interrupt can affect the variable. The compiler needs that relationship expressed in the source program. This is one situation where <code>volatile</code> becomes relevant:</p>
       <pre><code>volatile int flag = 0;</code></pre>
 
-      <p>
-        The qualifier tells the compiler that accesses to this object have
-        special observable behavior and must not be treated like ordinary
-        accesses that can freely be optimized away.
-      </p>
-
-      <h2>What volatile actually tells the compiler</h2>
-
-      <p>
-        When an object is declared <code>volatile</code>, the compiler must
-        preserve the required volatile accesses when generating the program.
-        It cannot simply assume that repeatedly reading the object will always
-        produce the same value.
-      </p>
-
-      <p>
-        This is particularly important when a value can be affected by
-        something outside the normal execution flow, such as:
-      </p>
-
+      <h2>What volatile actually does</h2>
+      <p>A volatile-qualified object has special access semantics. The compiler must preserve the required volatile accesses instead of treating them as ordinary accesses that can freely disappear, merge, or be reused when doing so would violate the observable behavior required by the language.</p>
+      <p>In embedded systems, this matters particularly for:</p>
       <ul>
-        <li>An interrupt service routine</li>
-        <li>A memory-mapped hardware register</li>
-        <li>A hardware peripheral</li>
-        <li>Another mechanism that can change the object independently of the
-            code currently being executed</li>
+        <li>Memory-mapped peripheral registers</li>
+        <li>Status values affected by hardware</li>
+        <li>Variables updated by an interrupt service routine</li>
+        <li>Other objects whose values can change through mechanisms outside the normal code flow</li>
       </ul>
 
-      <h2>Example: waiting for an interrupt</h2>
-
-      <p>
-        A common embedded pattern is to use a flag that is set inside an ISR:
-      </p>
-
+      <h2>volatile with interrupts</h2>
+      <p>A classic bare-metal pattern is an ISR setting a flag while the main loop processes it:</p>
       <pre><code>volatile int event = 0;
 
 void Timer_ISR(void)
@@ -139,346 +85,87 @@ int main(void)
         }
     }
 }</code></pre>
+      <p>Here, <code>volatile</code> helps ensure that the compiler treats reads and writes to <code>event</code> as observable accesses. It does not, however, answer whether the communication protocol between the ISR and main loop is sufficient for the application.</p>
 
-      <p>
-        Here, <code>volatile</code> communicates to the compiler that
-        <code>event</code> can change independently of the normal flow of
-        instructions being compiled.
-      </p>
+      <h2>volatile and hardware registers</h2>
+      <p>Hardware registers are another classic use case. A peripheral can change a register without the CPU executing a normal C assignment to that object.</p>
+      <pre><code>volatile unsigned int *STATUS =
+    (volatile unsigned int *)0x40000000;</code></pre>
+      <p>A read from a hardware register may therefore need to occur even when the compiler cannot see a conventional software reason for repeatedly reading it. Likewise, a write may be significant because it changes hardware state.</p>
 
-      <h2>But volatile does NOT make an operation atomic</h2>
+      <h2>What volatile does NOT solve</h2>
+      <p>This is the section worth remembering.</p>
+      <ul>
+        <li><strong>It does not make operations atomic.</strong></li>
+        <li><strong>It does not automatically prevent race conditions.</strong></li>
+        <li><strong>It does not make a multi-step read-modify-write operation indivisible.</strong></li>
+        <li><strong>It does not replace mutexes, semaphores, critical sections, or atomic operations.</strong></li>
+        <li><strong>It does not turn a flag into an event counter.</strong></li>
+      </ul>
 
-      <p>
-        This is one of the most important distinctions to understand.
-      </p>
-
-      <p>
-        Consider:
-      </p>
-
+      <h2>Why volatile does not make counter++ safe</h2>
+      <p>Consider:</p>
       <pre><code>volatile int counter;
 
 counter++;</code></pre>
-
-      <p>
-        It is tempting to think that <code>volatile</code> makes this operation
-        safe because the compiler is forced to access the variable.
-        It does not.
-      </p>
-
-      <p>
-        A read-modify-write operation can conceptually involve:
-      </p>
-
+      <p>It is tempting to think that because the variable is volatile, the increment must be safe. But a read-modify-write operation can conceptually involve:</p>
       <pre><code>read counter
 add 1
 write counter</code></pre>
-
-      <p>
-        An interrupt could occur between those operations. Therefore,
-        <code>volatile</code> does not provide a general guarantee that
-        <code>counter++</code> is indivisible.
-      </p>
-
-      <h2>volatile does NOT provide synchronization</h2>
-
-      <p>
-        Another common mistake is to use <code>volatile</code> as a replacement
-        for proper synchronization mechanisms.
-      </p>
-
-      <p>
-        If multiple execution contexts need to safely coordinate access to
-        shared data, simply declaring the data volatile does not automatically
-        make that communication safe.
-      </p>
-
-      <p>
-        Depending on the system, synchronization may require mechanisms such as:
-      </p>
-
-      <ul>
-        <li>Atomic operations</li>
-        <li>Critical sections</li>
-        <li>Interrupt masking</li>
-        <li>Mutexes</li>
-        <li>Semaphores</li>
-        <li>Memory-ordering mechanisms appropriate to the platform</li>
-      </ul>
-
-      <h2>volatile and hardware registers</h2>
-
-      <p>
-        One of the classic uses of <code>volatile</code> is a memory-mapped
-        hardware register.
-      </p>
-
-      <pre><code>volatile unsigned int *STATUS =
-    (volatile unsigned int *)0x40000000;</code></pre>
-
-      <p>
-        Hardware can change the value of a peripheral register without the CPU
-        executing an ordinary C assignment to that variable.
-      </p>
-
-      <p>
-        Similarly, a write to a hardware register may be important even when
-        the compiler cannot see an obvious software-level use for the value.
-      </p>
-
-      <p>
-        The <code>volatile</code> qualifier helps preserve the required
-        accesses to such objects.
-      </p>
+      <p>An interrupt or another execution context can interact with the variable between those steps. <code>volatile</code> does not provide a general atomicity guarantee for the entire increment.</p>
 
       <h2>volatile vs atomicity vs synchronization</h2>
-
       <table>
-        <thead>
-          <tr>
-            <th>Concept</th>
-            <th>Main purpose</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Concept</th><th>What problem it addresses</th></tr></thead>
         <tbody>
-          <tr>
-            <td>volatile</td>
-            <td>Controls how the compiler treats accesses to volatile objects</td>
-          </tr>
-          <tr>
-            <td>Atomic operation</td>
-            <td>Provides indivisible operation semantics where supported</td>
-          </tr>
-          <tr>
-            <td>Synchronization</td>
-            <td>Coordinates access and ordering between execution contexts</td>
-          </tr>
-          <tr>
-            <td>Critical section</td>
-            <td>Temporarily prevents conflicting execution in a protected region</td>
-          </tr>
+          <tr><td><code>volatile</code></td><td>How the compiler treats accesses to a volatile object</td></tr>
+          <tr><td>Atomic operation</td><td>Whether an operation has indivisible atomic semantics</td></tr>
+          <tr><td>Synchronization</td><td>How execution contexts safely coordinate shared state</td></tr>
+          <tr><td>Critical section</td><td>How access to a protected region is temporarily controlled</td></tr>
         </tbody>
       </table>
 
-      <p>
-        A useful mental model is:
-      </p>
+      <h2>The single-flag problem</h2>
+      <p>A volatile flag can tell the main program that <strong>at least one</strong> event occurred. It cannot necessarily tell the main program how many events occurred.</p>
+      <pre><code>ISR #1  → event = 1
+ISR #2  → event = 1
+Main    → sees event = 1</code></pre>
+      <p>If both interrupts happen before the main loop processes the flag, the fact that two events occurred may be lost. If every event matters, an event counter, queue, ring buffer, or another event-handling mechanism may be a better design.</p>
+      <p>See also: <a href="article.html?post=single-interrupt-flag-miss-events">Why a single interrupt flag can make you miss events</a>.</p>
 
-      <pre><code>volatile
-    ↓
-"Compiler, this object can have externally observable changes."
-
-atomic
-    ↓
-"This operation has indivisible semantics."
-
-synchronization
-    ↓
-"These execution contexts must coordinate safely."</code></pre>
-
-      <h2>A flag is not always enough</h2>
-
-      <p>
-        There is another limitation worth understanding.
-        A flag can tell the main program that
-        <strong>something happened</strong>, but it may not tell it
-        <strong>how many times it happened</strong>.
-      </p>
-
-      <p>
-        Suppose an ISR executes twice before the main loop processes the flag:
-      </p>
-
-      <pre><code>event = 1;
-event = 1;</code></pre>
-
-      <p>
-        The main program may still only see:
-      </p>
-
-      <pre><code>event == 1</code></pre>
-
-      <p>
-        The information that two separate events occurred has been lost.
-      </p>
-
-      <p>
-        When every event matters, an event counter, queue, ring buffer, or
-        another event-handling mechanism may be more appropriate.
-      </p>
-
-      <h2>My practical rule for volatile</h2>
-
-      <p>
-        When I see <code>volatile</code> in embedded C, I ask:
-      </p>
-
+      <h2>When should I use volatile?</h2>
       <ol>
-        <li>Can this value change outside the code currently being compiled?</li>
-        <li>Could hardware modify it?</li>
-        <li>Could an ISR modify it?</li>
-        <li>Am I confusing compiler visibility with atomicity?</li>
-        <li>Do I actually need synchronization as well?</li>
+        <li>Identify whether the object can change outside the normal code flow.</li>
+        <li>Check whether hardware or an ISR can modify it.</li>
+        <li>Ask whether the access itself must remain observable to the compiler.</li>
+        <li>Separately ask whether the operation also needs atomicity or synchronization.</li>
+        <li>Choose the synchronization mechanism required by the actual execution model.</li>
       </ol>
 
-      <p>
-        These questions prevent <code>volatile</code> from becoming a magic
-        keyword that is added whenever shared data looks suspicious.
-      </p>
+      <h2>Common misconception</h2>
+      <p><strong>"If data is shared, make it volatile."</strong> This is too broad. The correct question is not simply whether data is shared. The correct question is what can change the object, what guarantees the application requires, and which mechanism provides those guarantees.</p>
 
       <h2>Key takeaway</h2>
-
-      <p>
-        <strong>
-          volatile is primarily about how the compiler must treat accesses to
-          an object. It is not a general-purpose tool for making shared data
-          safe.
-        </strong>
-      </p>
-
-      <p>
-        In embedded systems, this distinction matters because interrupts,
-        hardware, compilers, and CPUs interact in different ways.
-      </p>
-
-      <p>
-        A program can be correct from the compiler's point of view and still
-        have a concurrency or synchronization problem.
-      </p>
-
-      <p>
-        That is why <code>volatile</code> should be viewed as one tool in the
-        embedded programmer's toolbox—not as a solution to every
-        shared-variable problem.
-      </p>
+      <p><strong><code>volatile</code> is not a magic safety keyword.</strong> It addresses the compiler's treatment of accesses to an object with externally observable changes. Atomicity, synchronization, event preservation, and memory-ordering requirements are separate engineering problems.</p>
+      <p>Understanding that distinction is one of the foundations of reliable embedded C programming.</p>
     `
   },
-
   {
     slug: "single-interrupt-flag-miss-events",
     title: "Why a Single Interrupt Flag Can Make You Miss Events",
     category: "Embedded Systems",
     date: "August 30, 2026",
-    excerpt:
-      "A simple flag looks convenient, but it cannot count multiple events that happen before the main loop processes the flag.",
-    content: `
-      <p>
-        A boolean flag is one of the simplest ways to communicate between an
-        interrupt service routine and the main program.
-      </p>
-
-      <p>
-        But a flag answers only one question:
-        <strong>Did something happen?</strong>
-      </p>
-
-      <p>
-        It does not necessarily answer:
-        <strong>How many times did it happen?</strong>
-      </p>
-
-      <h2>A simple example</h2>
-
-      <pre><code>volatile int eventFlag = 0;
-
-void ISR(void)
-{
-    eventFlag = 1;
-}
-
-int main(void)
-{
-    while (1)
-    {
-        if (eventFlag)
-        {
-            eventFlag = 0;
-
-            // Handle event
-        }
-    }
-}</code></pre>
-
-      <p>
-        This works when the application only cares that at least one event
-        occurred.
-      </p>
-
-      <h2>Where the problem appears</h2>
-
-      <p>
-        Imagine the interrupt occurs twice before the main loop gets a chance
-        to process the flag.
-      </p>
-
-      <pre><code>ISR #1 → eventFlag = 1
-ISR #2 → eventFlag = 1
-Main   → sees eventFlag = 1</code></pre>
-
-      <p>
-        The main program cannot distinguish one event from two events.
-        Both interrupts produced the same final state.
-      </p>
-
-      <h2>Better approaches</h2>
-
-      <p>
-        If every occurrence matters, consider using an event counter, queue,
-        ring buffer, or another mechanism that preserves multiple events.
-      </p>
-
-      <h2>Key takeaway</h2>
-
-      <p>
-        A flag is useful when the requirement is
-        <strong>"at least one event happened."</strong>
-        It is not sufficient when the requirement is
-        <strong>"process every event."</strong>
-      </p>
-    `
+    excerpt: "A simple flag is useful when you only care that something happened, but it cannot preserve multiple events that arrive before the main loop processes them.",
+    content: `<p>A flag is one of the simplest ways to communicate an event from an interrupt service routine to the main program.</p><h2>Where the problem appears</h2><p>If an interrupt happens twice before the main loop checks the flag, both interrupts can produce the same final state.</p><pre><code>ISR #1  → eventFlag = 1
+ISR #2  → eventFlag = 1
+Main    → sees eventFlag = 1</code></pre><p>A flag tells us that at least one event happened, but not necessarily how many events happened.</p><h2>Better approaches</h2><p>If every occurrence matters, consider an event counter, queue, ring buffer, or another mechanism that preserves multiple occurrences.</p><h2>Key takeaway</h2><p>Use a flag when the requirement is "something happened." Use a counting or buffering mechanism when the requirement is "process every occurrence."</p>`
   },
-
   {
     slug: "component-orientation-pick-place",
     title: "When Component Orientation Creates Pick-and-Place Problems",
-    category: "PCB Design",
+    category: "PCB & Hardware",
     date: "August 30, 2026",
-    excerpt:
-      "A practical observation: inconsistent component orientation inside a reel can create problems for automated assembly.",
-    content: `
-      <p>
-        While working around a PCB manufacturing issue, I noticed that the
-        orientation of components inside a reel does not always appear
-        consistent in a real production environment.
-      </p>
-
-      <h2>Why this matters</h2>
-
-      <p>
-        Pick-and-place machines depend on expected component orientation and
-        packaging information.
-      </p>
-
-      <p>
-        If the actual component orientation does not match that expectation,
-        recognition, rotation handling, or placement can fail.
-      </p>
-
-      <h2>What I learned</h2>
-
-      <p>
-        Component sourcing is not only about electrical specifications.
-        Packaging quality, component orientation, and supplier consistency
-        can also affect automated assembly.
-      </p>
-
-      <h2>Key takeaway</h2>
-
-      <p>
-        A component can be electrically correct and still create a
-        manufacturing problem if its physical presentation is inconsistent
-        with the assembly process.
-      </p>
-    `
+    excerpt: "A practical observation: inconsistent component orientation or packaging can create problems for automated assembly even when the component's electrical specification is correct.",
+    content: `<p>Component selection is not only about electrical specifications. Packaging, orientation, feeder setup, and supplier consistency can also affect automated assembly.</p><h2>Why this matters</h2><p>Pick-and-place equipment and vision systems work from expected physical presentation. When the actual presentation differs, recognition or rotation handling can fail.</p><h2>Key takeaway</h2><p>A component can be electrically correct and still create a manufacturing problem if its physical presentation is inconsistent with the assembly process.</p>`
   }
 ];

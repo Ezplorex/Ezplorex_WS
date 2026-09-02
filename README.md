@@ -1,26 +1,16 @@
-# Ezplorex Blog V2
+# Ezplorex Learnings V3
 
-This is now a functional static blog.
+Static HTML/CSS/JavaScript learning site for Ezplorex.
 
-## What changed
-- Homepage automatically shows the latest 3 posts.
-- Learnings page shows all posts.
-- Category filters work.
-- Every post opens as its own article page.
-- Homepage no longer needs manual editing for every new post.
+## V3 changes
+- Upgraded `volatile` article into a search-focused technical guide.
+- Changed its slug to `what-is-volatile-in-c`.
+- Added 8 topic categories, including Edge AI & AI in Electronics and Power Electronics.
+- Added topic cards and category filtering.
+- Added basic metadata, canonical handling, `robots.txt`, and `sitemap.xml`.
+- Preserved the existing Projects and About pages.
 
-## Add a new learning
-Open `posts.js`, copy one existing post object, and change:
-- slug
-- title
-- category
-- date
-- excerpt
-- content
-
-Save and refresh.
-
-Do not keep editing the homepage. The system reads the posts automatically.
-
-## Next step
-Deploy this folder free to Cloudflare Pages or GitHub Pages.
+## Publishing workflow
+1. Update `posts.js` for learning content.
+2. Commit changes to GitHub.
+3. Cloudflare automatically deploys the `main` branch.

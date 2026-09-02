@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ezplorex-ws.ezplorex.workers.dev/sitemap.xml
